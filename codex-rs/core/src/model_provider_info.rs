@@ -105,6 +105,15 @@ pub struct ModelProviderInfo {
     /// and API key (if needed) comes from the "env_key" environment variable.
     #[serde(default)]
     pub requires_openai_auth: bool,
+
+    /// Role mapping configuration for this provider.
+    /// Maps role names to alternative role names for providers that don't support certain roles.
+    ///
+    /// Example: `{"developer": "system"}` will map all "developer" roles to "system".
+    ///
+    /// This is useful when using model providers that don't support certain role names.
+    #[serde(default)]
+    pub role_mapping: Option<std::collections::HashMap<String, String>>,
 }
 
 impl ModelProviderInfo {

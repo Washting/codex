@@ -23,6 +23,16 @@ use codex_git::GhostCommit;
 use codex_utils_image::error::ImageProcessingError;
 use schemars::JsonSchema;
 
+/// Role mapping configuration for providers that don't support certain roles.
+/// Maps role names to alternative role names.
+///
+/// Example: `{"developer": "system"}` will map all "developer" roles to "system".
+///
+/// This is useful when using model providers that don't support certain role names.
+/// For instance, if a provider doesn't support the "developer" role, you can map
+/// it to "system" or "user" instead.
+pub type RoleMapping = HashMap<String, String>;
+
 /// Controls whether a command should use the session sandbox or bypass it.
 #[derive(
     Debug, Clone, Copy, Default, Eq, Hash, PartialEq, Serialize, Deserialize, JsonSchema, TS,
@@ -305,11 +315,26 @@ impl DeveloperInstructions {
 
 impl From<DeveloperInstructions> for ResponseItem {
     fn from(di: DeveloperInstructions) -> Self {
+        // Default conversion uses "developer" role
+        di.to_response_item(None)
+    }
+}
+
+impl DeveloperInstructions {
+    /// Convert to ResponseItem with optional role mapping.
+    /// If `role_mapping` is provided and contains a mapping for the "developer" role,
+    /// use that instead of "developer".
+    pub fn to_response_item(self, role_mapping: Option<&RoleMapping>) -> ResponseItem {
+        let role = role_mapping
+            .and_then(|mapping| mapping.get("developer"))
+            .map(|s| s.as_str())
+            .unwrap_or("developer");
+
         ResponseItem::Message {
             id: None,
-            role: "developer".to_string(),
+            role: role.to_string(),
             content: vec![ContentItem::InputText {
-                text: di.into_text(),
+                text: self.into_text(),
             }],
         }
     }

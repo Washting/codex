@@ -821,6 +821,14 @@
               "$ref": "#/definitions/WireApi"
             }
           ]
+        },
+        "role_mapping": {
+          "description": "Role mapping configuration for this provider. Maps role names to alternative role names for providers that don't support certain roles. Example: {\"developer\": \"system\"} will map all 'developer' roles to 'system'.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
         }
       },
       "additionalProperties": false
@@ -1059,6 +1067,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "RoleMapping": {
+      "description": "Role mapping configuration for providers that don't support certain roles. Maps role names to alternative role names.\n\nExample: `{\"developer\": \"system\"}` will map all \"developer\" roles to \"system\".\n\nThis is useful when using model providers that don't support certain role names. For instance, if a provider doesn't support the \"developer\" role, you can map it to \"system\" or \"user\" instead.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "RawMcpServerConfig": {
       "type": "object",

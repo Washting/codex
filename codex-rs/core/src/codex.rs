@@ -1502,16 +1502,30 @@ impl Session {
     ) -> Vec<ResponseItem> {
         let mut items = Vec::<ResponseItem>::with_capacity(4);
         let shell = self.user_shell();
+
+        // Get role mapping from the current model provider
+        let role_mapping = {
+            let state = self.state.lock().await;
+            state
+                .session_configuration
+                .provider
+                .role_mapping
+                .clone()
+        };
+
         items.push(
             DeveloperInstructions::from_policy(
                 &turn_context.sandbox_policy,
                 turn_context.approval_policy,
                 &turn_context.cwd,
             )
-            .into(),
+            .to_response_item(role_mapping.as_ref()),
         );
         if let Some(developer_instructions) = turn_context.developer_instructions.as_deref() {
-            items.push(DeveloperInstructions::new(developer_instructions.to_string()).into());
+            items.push(
+                DeveloperInstructions::new(developer_instructions.to_string())
+                    .to_response_item(role_mapping.as_ref()),
+            );
         }
         // Add developer instructions from collaboration_mode if they exist and are non-empty
         let collaboration_mode = {
@@ -1521,7 +1535,7 @@ impl Session {
         if let Some(collab_instructions) =
             DeveloperInstructions::from_collaboration_mode(&collaboration_mode)
         {
-            items.push(collab_instructions.into());
+            items.push(collab_instructions.to_response_item(role_mapping.as_ref()));
         }
         if let Some(user_instructions) = turn_context.user_instructions.as_deref() {
             items.push(
