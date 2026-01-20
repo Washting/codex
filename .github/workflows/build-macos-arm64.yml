@@ -2,27 +2,6 @@ name: Build macOS ARM64
 
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: 'Target architecture'
-        required: false
-        default: 'aarch64-apple-darwin'
-        type: choice
-        options:
-          - aarch64-apple-darwin
-          - x86_64-apple-darwin
-          - all
-  push:
-    branches:
-      - main
-      - 'feature/**'
-    paths:
-      - 'codex-rs/**'
-      - '.github/workflows/build-macos-arm64.yml'
-  pull_request:
-    paths:
-      - 'codex-rs/**'
-      - '.github/workflows/build-macos-arm64.yml'
 
 concurrency:
   group: ${{ github.workflow }}
@@ -31,7 +10,7 @@ concurrency:
 jobs:
   build:
     name: Build - ${{ matrix.target }}
-    runs-on: macos-15-xlarge
+    runs-on: macos-14
     timeout-minutes: 60
 
     strategy:
@@ -40,8 +19,6 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             arch: arm64
-          - target: x86_64-apple-darwin
-            arch: x64
 
     steps:
       - name: Checkout repository
