@@ -1,6 +1,7 @@
 name: Build macOS ARM64
 
 on:
+  pull_request: {}
   workflow_dispatch:
 
 concurrency:
@@ -10,7 +11,7 @@ concurrency:
 jobs:
   build:
     name: Build - ${{ matrix.target }}
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 60
 
     strategy:
