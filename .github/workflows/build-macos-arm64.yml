@@ -1,0 +1,175 @@
+name: Build macOS ARM64
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target architecture'
+        required: false
+        default: 'aarch64-apple-darwin'
+        type: choice
+        options:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+          - all
+  push:
+    branches:
+      - main
+      - 'feature/**'
+    paths:
+      - 'codex-rs/**'
+      - '.github/workflows/build-macos-arm64.yml'
+  pull_request:
+    paths:
+      - 'codex-rs/**'
+      - '.github/workflows/build-macos-arm64.yml'
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build - ${{ matrix.target }}
+    runs-on: macos-15-xlarge
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/codex-rs/target/
+          key: cargo-${{ runner.os }}-${{ matrix.target }}-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ matrix.target }}-release-
+
+      - name: Build codex
+        working-directory: codex-rs
+        run: |
+          echo "Building for ${{ matrix.target }}..."
+          cargo build --target ${{ matrix.target }} --release --bin codex
+
+      - name: Build codex-responses-api-proxy
+        working-directory: codex-rs
+        run: |
+          echo "Building codex-responses-api-proxy for ${{ matrix.target }}..."
+          cargo build --target ${{ matrix.target }} --release --bin codex-responses-api-proxy
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target="${{ matrix.target }}"
+          release_dir="codex-rs/target/${target}/release"
+          artifact_dir="artifacts/${target}"
+
+          mkdir -p "$artifact_dir"
+
+          echo "Copying binaries to $artifact_dir..."
+
+          if [ -f "$release_dir/codex" ]; then
+            cp "$release_dir/codex" "$artifact_dir/codex"
+            echo "✓ Copied codex"
+          else
+            echo "✗ Binary not found: $release_dir/codex"
+            exit 1
+          fi
+
+          if [ -f "$release_dir/codex-responses-api-proxy" ]; then
+            cp "$release_dir/codex-responses-api-proxy" "$artifact_dir/codex-responses-api-proxy"
+            echo "✓ Copied codex-responses-api-proxy"
+          else
+            echo "✗ Binary not found: $release_dir/codex-responses-api-proxy"
+            exit 1
+          fi
+
+          # Display file information
+          echo ""
+          echo "Built binaries:"
+          ls -lh "$artifact_dir"
+
+          # Show architecture
+          echo ""
+          echo "Binary architecture:"
+          file "$artifact_dir/codex"
+          file "$artifact_dir/codex-responses-api-proxy"
+
+      - name: Create tar.gz archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target="${{ matrix.target }}"
+          artifact_dir="artifacts/${target}"
+          archive_name="codex-${target}.tar.gz"
+
+          echo "Creating archive: $archive_name"
+          cd "$artifact_dir"
+          tar -czf "../$archive_name" codex codex-responses-api-proxy
+          cd ../..
+
+          echo "✓ Archive created: artifacts/$archive_name"
+          ls -lh "artifacts/$archive_name"
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-${{ matrix.target }}-binaries
+          path: artifacts/${{ matrix.target }}/codex
+          if-no-files-found: error
+
+      - name: Upload proxy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-${{ matrix.target }}-proxy
+          path: artifacts/${{ matrix.target }}/codex-responses-api-proxy
+          if-no-files-found: error
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-${{ matrix.target }}-archive
+          path: artifacts/codex-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+      - name: Display build summary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target="${{ matrix.target }}"
+          release_dir="codex-rs/target/${target}/release"
+
+          echo "## Build Summary for ${{ matrix.target }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -lh "$release_dir/codex" "$release_dir/codex-responses-api-proxy" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Architecture:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          file "$release_dir/codex" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
